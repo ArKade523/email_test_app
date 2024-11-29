@@ -1,0 +1,14 @@
+{
+  "name": "email_test_app",
+  "outputfilename": "email_test_app",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "scripts": {
+  },
+  "author": {
+    "name": "Kade Angell",
+    "email": "kade@angell.fyi"
+  }
+}
