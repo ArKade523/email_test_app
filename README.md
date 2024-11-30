@@ -1,26 +1,31 @@
+# Wails Email test app
+
+A simple email client
+
 ## About
 
-Wails template which includes: Vite, React, TS, TailwindCSS out of the box.
+This project was created using [wails](https://wails.io) with the [React/TS/Vite/Tailwind template](https://github.com/hotafrika/wails-vite-react-ts-tailwind-template)
 
-Build with `Wails CLI v2.0.0`.
+Created by Kade Angell
 
-To use this [template](https://wails.io/docs/community/templates):
-```shell
-wails init -n "Your Project Name" -t https://github.com/hotafrika/wails-vite-react-ts-tailwind-template
-cd frontend/src
-npm install
-```
+## Features
 
-[Here](scripts) you can find useful scripts for building on different platforms and Wails CLI installation.
+[X] Fetching inboxes
+[X] Basic user log in
+[X] Fetching emails for inbox
+[X] Fetching content for a given email
+[X] Parsing email body and returning the relevant HTML
+[X] Rendering an email's content
+[X] Transparent background
+[ ] User login with support for common IMAP providers
+[ ] User login with support for 2-factor auth
+[ ] Drafting emails
+[ ] Sending emails
 
-## Live Development
+## Screenshots
 
-To run in live development mode, run `wails dev` in the project directory. In another terminal, go into the `frontend`
-directory and run `npm run dev`. The frontend dev server will run on http://localhost:34115. Connect to this in your
-browser and connect to your application.
+Login page:
+![Login page](./doc/images/login_page.png)
 
-## Building
-
-To build a redistributable, production mode package, use `wails build`.
-
-
+Email page:
+![Email page](./doc/images/email_page.png)
