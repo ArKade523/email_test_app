@@ -19,10 +19,10 @@ function Main() {
     }
 
     return (
-        <>
+        <div className={`${navigator.userAgent.includes('Chrome') && "bg-black"}`}>
             {page === Pages.LOGIN && <Login setPage={setPageAndStorage} />}
             {page === Pages.MAIL && <Mail setPage={setPageAndStorage} />}
-        </>
+        </div>
     )
 }
 

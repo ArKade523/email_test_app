@@ -8,8 +8,12 @@ export function GetEmailsForMailbox(arg1:string):Promise<Array<mail.Serializable
 
 export function GetMailboxes():Promise<Array<string>>;
 
-export function Greet(arg1:string):Promise<string>;
+export function IsLoggedIn():Promise<boolean>;
 
 export function LoginUser(arg1:string,arg2:string,arg3:string):Promise<boolean>;
 
+export function LoginUserWithOAuth(arg1:string):Promise<boolean>;
+
 export function LogoutUser():Promise<void>;
+
+export function StartOAuth(arg1:string):Promise<void>;

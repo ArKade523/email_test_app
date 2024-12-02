@@ -1,25 +1,24 @@
 import './App.css'
 import { useEffect, useState } from 'react'
-import { GetEmailsForMailbox, GetEmailBody, GetMailboxes, LogoutUser } from "../wailsjs/go/main/App"
+import { GetEmailsForMailbox, GetEmailBody, GetMailboxes, LogoutUser } from "../wailsjs/go/wails_app/App"
 import { mail } from '../wailsjs/go/models'
 import { EventsOn } from '../wailsjs/runtime/runtime'
 import { Pages } from './main'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSync } from '@fortawesome/free-solid-svg-icons'
-import { faEnvelope, faFolder } from '@fortawesome/free-regular-svg-icons'
-import { faEnvelope as solidFaEnvelope, faFolder as solidFaFolder } from '@fortawesome/free-solid-svg-icons'
-import { formatDate } from './utls/dateUtils'
+import { faEnvelopeOpen, faFolderOpen, faSync, faTrashAlt, IconDefinition } from '@fortawesome/free-solid-svg-icons'
+import { faEnvelope, faFile, faFolder, faPaperPlane, faTrashCan } from '@fortawesome/free-regular-svg-icons'
+import { faPaperPlane as faPaperPlaneSolid, faFile as faFileSolid } from '@fortawesome/free-solid-svg-icons'
+import { formatDate } from './utils/dateUtils'
 
-const testInboxes = [
-    "INBOX",
-    "Sent",
-    "Drafts",
-    "Trash",
-    "Spam"
-]
+const knownMailboxIcons: { [key: string]: [IconDefinition, IconDefinition] } = {
+    "INBOX": [faEnvelope, faEnvelopeOpen],
+    "Sent": [faPaperPlane, faPaperPlaneSolid],
+    "Trash": [faTrashCan, faTrashAlt],
+    "Drafts": [faFile, faFileSolid]
+}
 
 function Mail({setPage}: {setPage: (page: Pages) => void}) {
-    const [mailboxes, setMailboxes] = useState<string[] | null>(testInboxes)
+    const [mailboxes, setMailboxes] = useState<string[] | null>(['INBOX'])
     const [selectedMailbox, setSelectedMailbox] = useState<string>('')
     const [emails, setEmails] = useState<mail.SerializableMessage[] | null>([])
     const [emailBody, setEmailBody] = useState<string>('')
@@ -30,7 +29,28 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     const getMailboxes = async () => {
         setLoading(true)
         const newMailboxes = await GetMailboxes()
-        setMailboxes(newMailboxes)
+        if (newMailboxes && newMailboxes.length > 0) {
+            if (newMailboxes.includes('INBOX')) {
+                setSelectedMailbox('INBOX')
+                getEmails('INBOX')
+            }
+
+            // Sort the mailboxes so that mailboxes in the knownMailboxIcons object are displayed first
+            const knownMailboxes = Object.keys(knownMailboxIcons)
+            const sortedMailboxes = newMailboxes.sort((a, b) => {
+                if (knownMailboxes.includes(a) && knownMailboxes.includes(b)) {
+                    return knownMailboxes.indexOf(a) - knownMailboxes.indexOf(b)
+                } else if (knownMailboxes.includes(a)) {
+                    return -1
+                } else if (knownMailboxes.includes(b)) {
+                    return 1
+                }
+                return a.localeCompare(b)
+            })
+
+            setMailboxes(sortedMailboxes)
+        } 
+
         setLoading(false)
     }
 
@@ -44,6 +64,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
 
     const logOut = async () => {
         await LogoutUser()
+        console.log('Logged out')
         setPage(Pages.LOGIN)
     }
 
@@ -54,13 +75,6 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
 
     useEffect(() => {
         getMailboxes()
-
-        if (mailboxes && mailboxes.length > 0) {
-            if (mailboxes.includes('INBOX')) {
-                setSelectedMailbox('INBOX')
-                getEmails('INBOX')
-            }
-        }
 
         const unsubscribe = EventsOn("UserLoggedOut", () => {
             setPage(Pages.LOGIN)
@@ -91,13 +105,12 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                                     onClick={() => {getEmails(mailbox)}}
                                 >
                                     <FontAwesomeIcon 
-                                        icon={selectedMailbox === mailbox 
-                                            ? (mailbox === 'INBOX' ? solidFaEnvelope : solidFaFolder) 
-                                            : (mailbox === 'INBOX' ? faEnvelope : faFolder)
-                                        } 
-                                        className="mr-2" 
+                                        icon={selectedMailbox === mailbox ? 
+                                            knownMailboxIcons[mailbox] ? knownMailboxIcons[mailbox][1] : faFolderOpen : 
+                                            knownMailboxIcons[mailbox] ? knownMailboxIcons[mailbox][0] : faFolder} 
+                                        className="text-gray-300 mr-2" 
                                     />
-                                    {mailbox}
+                                    {mailbox === 'INBOX' ? 'Inbox' : mailbox}
                                 </li>
                             ))}
                         </ul>
@@ -124,12 +137,16 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                     {emails && emails.length > 0 ? (
                     emails.map((email, index) => (
                         <div key={index} className="flex flex-col">
-                            <div className={`${selectedEmail === email ? "bg-blue-700 rounded" : ""} text-xs border-b py-2 px-4 text-gray-100 border-gray-400 cursor-pointer select-none`}
+                            <div className={`${selectedEmail === email ? "bg-blue-700 rounded" : ""} text-xs py-2 px-4 text-gray-100 cursor-pointer select-none`}
                                 onClick={() => handleEmailClick(email)}
                             >
                                 <p className="font-bold overflow-x-hidden overflow-ellipsis whitespace-nowrap">{email.envelope?.Sender[0].PersonalName}</p>
                                 <p className="overflow-x-hidden overflow-ellipsis whitespace-nowrap">{email.envelope?.Subject}</p>
                             </div>
+                            {
+                                // Add a horizontal line between emails. No line on the last email
+                                index !== emails.length - 1 && <span className="h-[1px] my-[2px] w-[90%] bg-gray-400 self-center"></span>
+                            }
                         </div>
                     ))) : (
                         <div className="text-gray-400 text-xl font-bold font-mono">

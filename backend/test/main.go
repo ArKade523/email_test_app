@@ -1,7 +1,7 @@
 package main
 
 import (
-	"email_test_app/mail"
+	"email_test_app/backend/mail"
 	"fmt"
 	"os"
 

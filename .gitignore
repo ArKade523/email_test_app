@@ -52,3 +52,6 @@ Thumbs.db
 
 # Private environment variables
 .env
+
+# client secret
+client_secret*

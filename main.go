@@ -1,8 +1,12 @@
 package main
 
 import (
+	"email_test_app/backend/wails_app"
 	"embed"
+	"fmt"
+	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/logger"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -18,7 +22,11 @@ var icon []byte
 
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
+	app := wails_app.NewApp()
+
+	godotenv.Load()
+
+	fmt.Println("GOOGLE_CLIENT_ID:", os.Getenv("GOOGLE_CLIENT_ID"))
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -27,7 +35,7 @@ func main() {
 		MinHeight:        400,
 		Assets:           assets,
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
-		OnStartup:        app.startup,
+		OnStartup:        app.Startup,
 		DisableResize:    false,
 		Windows: &windows.Options{
 			WebviewIsTransparent: true,
@@ -37,15 +45,20 @@ func main() {
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  true,
 			TitleBar:             mac.TitleBarHiddenInset(),
+			About: &mac.AboutInfo{
+				Title:   "email_test_app",
+				Message: "2024 Kade Angell",
+				Icon:    icon,
+			},
 		},
 		Bind: []interface{}{
 			app,
 		},
 		Logger:        &logger.DefaultLogger{},
 		LogLevel:      logger.ERROR,
-		OnDomReady:    app.domReady,
-		OnShutdown:    app.shutdown,
-		OnBeforeClose: app.beforeClose,
+		OnDomReady:    app.DomReady,
+		OnShutdown:    app.Shutdown,
+		OnBeforeClose: app.BeforeClose,
 	})
 
 	if err != nil {
