@@ -94,10 +94,10 @@ function Login({ setPage }: { setPage: (page: Pages) => void }) {
                         {emailProviders.map((provider) => (
                             <button
                                 key={provider.name}
-                                className="transition ease-in-out duration-300 motion-reduce:transition-none focus:bg-blue-500 hover:bg-blue-500 bg-white/20 text-white p-2 rounded"
+                                className="relative transition ease-in-out duration-300 motion-reduce:transition-none focus:bg-blue-500 hover:bg-blue-500 bg-white/20 text-white p-2 rounded"
                                 onClick={() => clickProvider(provider)}
                             >
-                                {provider.faIcon && <FontAwesomeIcon icon={provider.faIcon} className="mr-2 text-xl" />}
+                                {provider.faIcon && <FontAwesomeIcon icon={provider.faIcon} className="mr-2 text-xl absolute left-4" />}
                                 {provider.name}
                             </button>
                         ))}

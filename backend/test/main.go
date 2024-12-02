@@ -22,7 +22,7 @@ func main() {
 	for m := range mailboxes {
 		if mailboxes[m].Name == "INBOX" {
 			fmt.Println("Reading from Mailbox:", mailboxes[m].Name)
-			messages, err := mail.FetchEmailsForMailbox(client, mailboxes[m].Name)
+			messages, err := mail.FetchEmailsForMailbox(client, mailboxes[m].Name, 1, 10)
 			if err != nil {
 				fmt.Printf("Error fetching messages: %v", err)
 				os.Exit(1)

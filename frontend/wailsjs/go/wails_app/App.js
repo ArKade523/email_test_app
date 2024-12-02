@@ -6,8 +6,8 @@ export function GetEmailBody(arg1, arg2) {
   return window['go']['wails_app']['App']['GetEmailBody'](arg1, arg2);
 }
 
-export function GetEmailsForMailbox(arg1) {
-  return window['go']['wails_app']['App']['GetEmailsForMailbox'](arg1);
+export function GetEmailsForMailbox(arg1, arg2, arg3) {
+  return window['go']['wails_app']['App']['GetEmailsForMailbox'](arg1, arg2, arg3);
 }
 
 export function GetMailboxes() {

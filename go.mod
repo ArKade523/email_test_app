@@ -6,6 +6,7 @@ toolchain go1.23.2
 
 require (
 	github.com/emersion/go-imap v1.2.1
+	github.com/emersion/go-message v0.18.1
 	github.com/joho/godotenv v1.5.1
 	github.com/wailsapp/wails/v2 v2.9.2
 	golang.org/x/oauth2 v0.24.0

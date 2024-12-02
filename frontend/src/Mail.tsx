@@ -1,5 +1,5 @@
 import './App.css'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { GetEmailsForMailbox, GetEmailBody, GetMailboxes, LogoutUser } from "../wailsjs/go/wails_app/App"
 import { mail } from '../wailsjs/go/models'
 import { EventsOn } from '../wailsjs/runtime/runtime'
@@ -17,6 +17,8 @@ const knownMailboxIcons: { [key: string]: [IconDefinition, IconDefinition] } = {
     "Drafts": [faFile, faFileSolid]
 }
 
+const NUM_EMAILS_TO_FETCH = 20
+
 function Mail({setPage}: {setPage: (page: Pages) => void}) {
     const [mailboxes, setMailboxes] = useState<string[] | null>(['INBOX'])
     const [selectedMailbox, setSelectedMailbox] = useState<string>('')
@@ -25,6 +27,9 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     const [selectedEmail, setSelectedEmail] = useState<mail.SerializableMessage | null>(null)
     const [loading, setLoading] = useState<boolean>(false)
     const [mailLoading, setMailLoading] = useState<boolean>(false)
+    const emailListRef = useRef<HTMLDivElement>(null)
+
+    const emailsPerInbox = useRef<{ [key: string]: number }>({})
     
     const getMailboxes = async () => {
         setLoading(true)
@@ -58,7 +63,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
         setMailLoading(true)
         setEmailBody('')
         setSelectedEmail(email || null);
-        setEmailBody(await GetEmailBody(email.mailbox_name, email.seq_num))
+        setEmailBody(await GetEmailBody(email.mailbox_name, email.uid))
         setMailLoading(false)
     }
 
@@ -70,7 +75,15 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
 
     const getEmails = async (mailbox: string) => {
         setSelectedMailbox(mailbox)
-        setEmails(await GetEmailsForMailbox(mailbox))    
+        const numEmails = emailsPerInbox.current[mailbox] || 0
+        const newEmails = await GetEmailsForMailbox(mailbox, numEmails, numEmails + NUM_EMAILS_TO_FETCH)
+        console.log(`Got ${newEmails.length} emails for ${mailbox} from indices ${numEmails} to ${numEmails + NUM_EMAILS_TO_FETCH}`)
+        if (emails && emails.length > 0) {
+            setEmails([...emails, ...newEmails])
+        } else {
+            setEmails(newEmails)
+        }
+        emailsPerInbox.current[mailbox] = numEmails + NUM_EMAILS_TO_FETCH
     }
 
     const formatMailboxName = (mailbox: string) => {
@@ -101,6 +114,27 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
             unsubscribe()
         }
     }, [])
+
+    useEffect(() => {
+        const handleMailListScroll = () => {
+            if (emailListRef.current) {
+                const { scrollTop, scrollHeight, clientHeight } = emailListRef.current
+                if (scrollTop + clientHeight >= scrollHeight) {
+                    getEmails(selectedMailbox)
+                }
+            }
+            console.log('Scrolled')
+        }
+
+        const emailListElement = emailListRef.current
+        if (emailListElement) {
+            emailListElement.addEventListener('scroll', handleMailListScroll);
+            return () => {
+                emailListElement.removeEventListener('scroll', handleMailListScroll);
+            };
+        }
+    }, [emailListRef, selectedMailbox])
+
     
     return (
         <div className="max-h-screen flex py-8">
@@ -113,7 +147,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
             }
             <div className="flex flex-col w-max px-4 justify-between h-[95vh] whitespace-nowrap">
                 <div className="flex flex-col w-max">
-                    <h2 className="font-bold text-sm text-gray-100 ml-2">Inbox</h2>
+                    <h2 className="font-bold text-xs text-gray-100 ml-2 select-none">Mailboxes</h2>
                     <div className="w-max overflow-y-scroll">
                         <ul>
                             {mailboxes && mailboxes.map((mailbox, index) => (
@@ -150,14 +184,16 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                 </div>
             </div>
             <div className="max-h-full overflow-y-scroll w-80 max-w-md">
-                <div className="flex flex-col px-1">
+                <div className="flex flex-col px-1"
+                    ref={emailListRef}
+                >
                     {emails && emails.length > 0 ? (
                     emails.map((email, index) => (
                         <div key={index} className="flex flex-col">
                             <div className={`${selectedEmail === email ? "bg-blue-700 rounded" : ""} text-xs py-2 px-4 text-gray-100 cursor-pointer select-none`}
                                 onClick={() => handleEmailClick(email)}
                             >
-                                <p className="font-bold overflow-x-hidden overflow-ellipsis whitespace-nowrap">{email.envelope?.Sender[0].PersonalName}</p>
+                                <p className="font-bold overflow-x-hidden overflow-ellipsis whitespace-nowrap">{email.envelope?.Sender?.[0]?.PersonalName || "Unknown Sender"}</p>
                                 <p className="overflow-x-hidden overflow-ellipsis whitespace-nowrap">{email.envelope?.Subject}</p>
                             </div>
                             {
@@ -177,7 +213,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                     {selectedEmail &&
                         <div className="grid grid-cols-5 gap-2">
                             <div className="text-gray-100 col-span-3">
-                                <h2 className="text-lg font-bold">{selectedEmail?.envelope?.Sender[0].PersonalName}</h2>
+                                <h2 className="text-lg font-bold">{selectedEmail?.envelope?.Sender?.[0]?.PersonalName || "Unknown Sender"}</h2>
                                 <p className="font-light text-sm">{selectedEmail?.envelope?.Subject}</p>
                             </div>
                             <div className="text-gray-100 col-span-2 content-center">

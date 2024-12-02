@@ -73,7 +73,7 @@ export namespace imap {
 export namespace mail {
 	
 	export class SerializableMessage {
-	    seq_num: number;
+	    uid: number;
 	    envelope?: imap.Envelope;
 	    body: string;
 	    mailbox_name: string;
@@ -84,7 +84,7 @@ export namespace mail {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.seq_num = source["seq_num"];
+	        this.uid = source["uid"];
 	        this.envelope = this.convertValues(source["envelope"], imap.Envelope);
 	        this.body = source["body"];
 	        this.mailbox_name = source["mailbox_name"];

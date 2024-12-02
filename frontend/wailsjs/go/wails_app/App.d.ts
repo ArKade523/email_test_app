@@ -4,7 +4,7 @@ import {mail} from '../models';
 
 export function GetEmailBody(arg1:string,arg2:number):Promise<string>;
 
-export function GetEmailsForMailbox(arg1:string):Promise<Array<mail.SerializableMessage>>;
+export function GetEmailsForMailbox(arg1:string,arg2:number,arg3:number):Promise<Array<mail.SerializableMessage>>;
 
 export function GetMailboxes():Promise<Array<string>>;
 

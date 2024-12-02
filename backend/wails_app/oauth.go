@@ -111,15 +111,15 @@ func (a *App) oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	// Write the file content as the response
 	fmt.Fprint(w, string(htmlContent))
-
-	http.HandleFunc("/appicon.png", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		w.Write(assets.AppIconPNG)
-	})
 }
 
 func (a *App) startHTTPServer() {
 	http.HandleFunc("/oauth2callback", a.oauthCallbackHandler)
+	http.HandleFunc("/appicon.png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(assets.AppIconPNG)
+	})
+
 	a.httpServer = &http.Server{Addr: "localhost:9498"}
 
 	// Start the server

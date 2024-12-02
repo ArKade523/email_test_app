@@ -78,7 +78,7 @@ func (a *App) GetMailboxes() []string {
 }
 
 // GetEmailsForMailbox returns emails for a mailbox, using cache if available
-func (a *App) GetEmailsForMailbox(mailboxName string) []mail.SerializableMessage {
+func (a *App) GetEmailsForMailbox(mailboxName string, start, limit uint32) []mail.SerializableMessage {
 	if !a.IsLoggedIn() {
 		log.Println("GetEmailsForMailbox: User not logged in.")
 		a.LogoutUser()
@@ -105,7 +105,7 @@ func (a *App) GetEmailsForMailbox(mailboxName string) []mail.SerializableMessage
 		oauthConfig := auth.GmailOAuthConfig
 		var newToken *oauth2.Token
 		newToken, err = mail.WithOAuthClient(a.imapUrl, a.emailAddr, a.oauthToken, oauthConfig, func(c *client.Client) error {
-			emails, err := mail.FetchEmailsForMailbox(c, mailboxName)
+			emails, err := mail.FetchEmailsForMailbox(c, mailboxName, start, limit)
 			if err != nil {
 				return err
 			}
@@ -118,7 +118,7 @@ func (a *App) GetEmailsForMailbox(mailboxName string) []mail.SerializableMessage
 	} else {
 		// Use regular client
 		err = mail.WithClient(a.imapUrl, a.emailAddr, a.emailAppPassword, func(c *client.Client) error {
-			emails, err := mail.FetchEmailsForMailbox(c, mailboxName)
+			emails, err := mail.FetchEmailsForMailbox(c, mailboxName, start, limit)
 			if err != nil {
 				return err
 			}
