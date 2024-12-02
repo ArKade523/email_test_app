@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -43,16 +44,20 @@ func WithClient(imapUrl, emailAddr, emailAppPassword string, fn func(c *client.C
 type XOAuth2Client struct {
 	username    string
 	accessToken string
+	done        bool
 }
 
 func (a *XOAuth2Client) Start() (mech string, ir []byte, err error) {
 	mech = "XOAUTH2"
-	ir = []byte(fmt.Sprintf("user=%s\x00auth=Bearer %s\x01\x01", a.username, a.accessToken))
+	ir = []byte(fmt.Sprintf("user=%s\x01auth=Bearer %s\x01\x01", a.username, a.accessToken))
 	return
 }
 
 func (a *XOAuth2Client) Next(challenge []byte) (response []byte, err error) {
-	// No additional steps required
+	if a.done {
+		return nil, errors.New("unexpected server challenge")
+	}
+	a.done = true
 	return nil, nil
 }
 

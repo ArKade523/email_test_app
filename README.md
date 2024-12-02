@@ -19,7 +19,7 @@ Current Status: PARTIALLY WORKING
 - [X] Parsing email body and returning the relevant HTML
 - [X] Rendering an email's content
 - [X] Transparent background
-- [/] User login with support for common IMAP providers
+- [O] User login with support for common IMAP providers
 - [ ] User login with support for 2-factor auth
 - [ ] Drafting emails
 - [ ] Sending emails

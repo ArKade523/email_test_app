@@ -73,6 +73,23 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
         setEmails(await GetEmailsForMailbox(mailbox))    
     }
 
+    const formatMailboxName = (mailbox: string) => {
+        if (mailbox === 'INBOX') {
+            return 'Inbox'
+        }
+        if (mailbox.includes('[Gmail]/')) {
+            return mailbox.replace('[Gmail]/', '')
+        }
+        if (mailbox.includes('[Gmail]')) {
+            if (mailbox === '[Gmail]') {
+                const newMailboxes = mailboxes?.filter((m) => m !== mailbox) || []
+                setMailboxes(newMailboxes)
+            }
+            return mailbox.replace('[Gmail]', '')
+        }
+        return mailbox
+    }
+
     useEffect(() => {
         getMailboxes()
 
@@ -88,7 +105,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     return (
         <div className="max-h-screen flex py-8">
             {loading && 
-                <div className="absolute h-full w-full bg-gray-300/50 grid place-items-center">
+                <div className="absolute top-0 h-full w-full bg-gray-300/50 grid place-items-center">
                     <span className="text-gray-400 text-2xl font-bold font-mono drop-shadow-xl">
                         Loading...
                     </span>
@@ -110,7 +127,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                                             knownMailboxIcons[mailbox] ? knownMailboxIcons[mailbox][0] : faFolder} 
                                         className="text-gray-300 mr-2" 
                                     />
-                                    {mailbox === 'INBOX' ? 'Inbox' : mailbox}
+                                    {formatMailboxName(mailbox)}
                                 </li>
                             ))}
                         </ul>

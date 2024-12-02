@@ -2,7 +2,9 @@ package wails_app
 
 import (
 	"context"
+	"email_test_app/backend/assets"
 	"email_test_app/backend/auth"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -99,7 +101,21 @@ func (a *App) oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// Send the code back to the application
 	a.oauthCodeChannel <- code
 
-	fmt.Fprintf(w, "Authentication successful! You can close this window.")
+	htmlContent, err := assets.OauthSuccessHTML.ReadFile("oauth_success.html")
+	if err != nil {
+		http.Error(w, "Unable to load HTML", http.StatusInternalServerError)
+		return
+	}
+
+	// Set the Content-Type to text/html
+	w.Header().Set("Content-Type", "text/html")
+	// Write the file content as the response
+	fmt.Fprint(w, string(htmlContent))
+
+	http.HandleFunc("/appicon.png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(assets.AppIconPNG)
+	})
 }
 
 func (a *App) startHTTPServer() {

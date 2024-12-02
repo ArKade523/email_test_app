@@ -18,7 +18,12 @@ func init() {
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		RedirectURL:  "http://localhost:9498/oauth2callback",
-		Scopes:       []string{"https://mail.google.com/"},
-		Endpoint:     google.Endpoint,
+		Scopes: []string{
+			"https://mail.google.com/",
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+			"openid",
+		},
+		Endpoint: google.Endpoint,
 	}
 }
