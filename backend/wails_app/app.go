@@ -2,6 +2,7 @@ package wails_app
 
 import (
 	"context"
+	"database/sql"
 	"email_test_app/backend/mail"
 	"log"
 	"net/http"
@@ -39,10 +40,8 @@ type App struct {
 
 	emailBodyCache      map[string]map[uint32]EmailBodyCacheEntry // New cache for email bodies
 	emailBodyCacheMutex sync.Mutex                                // Mutex for emailBodyCache
+	db                  *sql.DB
 }
-
-const MAILBOX_CACHE_TIME = 5 * time.Minute
-const EMAIL_CACHE_TIME = 5 * time.Minute
 
 // NewApp creates a new App application struct
 func NewApp() *App {

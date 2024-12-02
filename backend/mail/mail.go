@@ -7,6 +7,7 @@ import (
 	"log"
 	"mime"
 	"mime/quotedprintable"
+	"slices"
 	"strings"
 
 	"github.com/emersion/go-imap"
@@ -117,7 +118,7 @@ func FetchEmailsForMailbox(c *client.Client, mailboxName string, start, limit ui
 		return nil, err
 	}
 
-	// No need to sort the result since UIDs are already in the desired order
+	slices.Reverse(result)
 
 	return result, nil
 }

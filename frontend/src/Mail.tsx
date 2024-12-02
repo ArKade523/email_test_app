@@ -57,7 +57,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
         } 
 
         setLoading(false)
-    }
+    };
 
     const handleEmailClick = async (email: mail.SerializableMessage) => {
         setMailLoading(true)
