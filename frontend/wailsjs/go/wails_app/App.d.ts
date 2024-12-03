@@ -17,3 +17,7 @@ export function LoginUserWithOAuth(arg1:string):Promise<boolean>;
 export function LogoutUser():Promise<void>;
 
 export function StartOAuth(arg1:string):Promise<void>;
+
+export function UpdateMailboxes():Promise<void>;
+
+export function UpdateMessages(arg1:string):Promise<void>;

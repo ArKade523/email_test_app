@@ -8,7 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 )
+
+const MAILBOX_UPDATE_TIME = 5 * time.Minute
+const EMAIL_UPDATE_TIME = 5 * time.Minute
 
 // startup is called at application startup
 func (a *App) Startup(ctx context.Context) {
@@ -21,6 +25,10 @@ func (a *App) Startup(ctx context.Context) {
 		log.Println("Error getting app data directory:", err)
 		return
 	}
+
+	// create a ticker to update mailboxes every 5 minutes
+	a.mailboxUpdateTicker = time.NewTicker(MAILBOX_UPDATE_TIME)
+	a.emailUpdateTicker = time.NewTicker(EMAIL_UPDATE_TIME)
 
 	a.db, err = db.InitDB(appDataDir + "/email_test_app.db")
 	if err != nil {

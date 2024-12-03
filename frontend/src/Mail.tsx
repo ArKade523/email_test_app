@@ -60,6 +60,12 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     };
 
     const handleEmailClick = async (email: mail.SerializableMessage) => {
+        if (selectedEmail === email) {
+            return
+        }
+        if (mailLoading) {
+            return
+        }
         setMailLoading(true)
         setEmailBody('')
         setSelectedEmail(email || null);
@@ -74,10 +80,14 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     }
 
     const getEmails = async (mailbox: string) => {
+        if (selectedMailbox !== mailbox) {
+            setEmails([])
+        }
         setSelectedMailbox(mailbox)
         const numEmails = emailsPerInbox.current[mailbox] || 0
         const newEmails = await GetEmailsForMailbox(mailbox, numEmails, numEmails + NUM_EMAILS_TO_FETCH)
-        console.log(`Got ${newEmails.length} emails for ${mailbox} from indices ${numEmails} to ${numEmails + NUM_EMAILS_TO_FETCH}`)
+        console.log(newEmails)
+        console.log(`Got ${newEmails?.length || "unknown"} emails for ${mailbox} from indices ${numEmails} to ${numEmails + NUM_EMAILS_TO_FETCH}`)
         if (emails && emails.length > 0) {
             setEmails([...emails, ...newEmails])
         } else {
@@ -106,12 +116,24 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     useEffect(() => {
         getMailboxes()
 
-        const unsubscribe = EventsOn("UserLoggedOut", () => {
+        let unsubscribeFunctions = [] as (() => void)[]
+
+        unsubscribeFunctions.push(EventsOn("UserLoggedOut", () => {
             setPage(Pages.LOGIN)
-        })
+        }))
+        unsubscribeFunctions.push(EventsOn("MailboxesUpdated", () => {
+            getMailboxes()
+        }))
+        unsubscribeFunctions.push(EventsOn("MessagesUpdated", (mailboxName: string) => {
+            if (selectedMailbox === mailboxName) {
+                getEmails(mailboxName)
+            }
+        }))
 
         return () => {
-            unsubscribe()
+            for (const unsubscribe of unsubscribeFunctions) {
+                unsubscribe()
+            }
         }
     }, [])
 

@@ -33,3 +33,11 @@ export function LogoutUser() {
 export function StartOAuth(arg1) {
   return window['go']['wails_app']['App']['StartOAuth'](arg1);
 }
+
+export function UpdateMailboxes() {
+  return window['go']['wails_app']['App']['UpdateMailboxes']();
+}
+
+export function UpdateMessages(arg1) {
+  return window['go']['wails_app']['App']['UpdateMessages'](arg1);
+}

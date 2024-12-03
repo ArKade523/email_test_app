@@ -6,7 +6,6 @@ import (
 	"email_test_app/backend/mail"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/emersion/go-imap/client"
@@ -21,35 +20,25 @@ type EmailBodyCacheEntry struct {
 
 // App struct
 type App struct {
-	ctx               context.Context
-	imapUrl           string
-	emailAddr         string
-	emailAppPassword  string
-	mailboxCache      []string
-	mailboxCacheTime  time.Time
-	mailboxCacheMutex sync.Mutex
+	ctx              context.Context
+	imapUrl          string
+	emailAddr        string
+	emailAppPassword string
 
 	oauthToken       *oauth2.Token
 	oauthState       string
 	oauthCodeChannel chan string
 	httpServer       *http.Server
 
-	emailCache      map[string][]mail.SerializableMessage
-	emailCacheTimes map[string]time.Time
-	emailCacheMutex sync.Mutex
+	mailboxUpdateTicker *time.Ticker
+	emailUpdateTicker   *time.Ticker
 
-	emailBodyCache      map[string]map[uint32]EmailBodyCacheEntry // New cache for email bodies
-	emailBodyCacheMutex sync.Mutex                                // Mutex for emailBodyCache
-	db                  *sql.DB
+	db *sql.DB
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{
-		emailCache:      make(map[string][]mail.SerializableMessage),
-		emailCacheTimes: make(map[string]time.Time),
-		emailBodyCache:  make(map[string]map[uint32]EmailBodyCacheEntry), // Initialize the email body cache
-	}
+	return &App{}
 }
 
 func (a *App) LoginUserWithOAuth(providerName string) bool {
@@ -58,6 +47,9 @@ func (a *App) LoginUserWithOAuth(providerName string) bool {
 		log.Println("OAuth login failed:", err)
 		return false
 	}
+
+	a.startUpdateLoops()
+
 	return true
 }
 
@@ -77,6 +69,9 @@ func (a *App) LoginUser(imapUrl, emailAddr, emailAppPassword string) bool {
 	a.imapUrl = imapUrl
 	a.emailAddr = emailAddr
 	a.emailAppPassword = emailAppPassword
+
+	a.startUpdateLoops()
+
 	return true
 }
 
@@ -89,19 +84,7 @@ func (a *App) LogoutUser() {
 	a.emailAddr = ""
 	a.emailAppPassword = ""
 
-	// Clear caches
-	a.mailboxCacheMutex.Lock()
-	a.mailboxCache = nil
-	a.mailboxCacheMutex.Unlock()
-
-	a.emailCacheMutex.Lock()
-	a.emailCache = make(map[string][]mail.SerializableMessage)
-	a.emailCacheTimes = make(map[string]time.Time)
-	a.emailCacheMutex.Unlock()
-
-	a.emailBodyCacheMutex.Lock()
-	a.emailBodyCache = make(map[string]map[uint32]EmailBodyCacheEntry) // Clear the email body cache
-	a.emailBodyCacheMutex.Unlock()
+	a.endUpdateLoops()
 
 	runtime.EventsEmit(a.ctx, "UserLoggedOut", nil)
 }

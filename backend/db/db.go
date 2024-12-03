@@ -31,14 +31,11 @@ func createSchema(db *sql.DB) error {
     );
 
     CREATE TABLE IF NOT EXISTS mailboxes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        account_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-		last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (account_id) REFERENCES accounts (id)
-    );
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE
+	);
 
-    CREATE TABLE IF NOT EXISTS messages (
+	CREATE TABLE IF NOT EXISTS messages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		mailbox_name TEXT NOT NULL,
 		uid INTEGER NOT NULL,

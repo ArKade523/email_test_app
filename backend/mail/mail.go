@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"bufio"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -105,10 +106,11 @@ func FetchEmailsForMailbox(c *client.Client, mailboxName string, start, limit ui
 		if msg == nil || msg.Envelope == nil {
 			continue
 		}
+
 		serializableMsg := SerializableMessage{
 			UID:         msg.Uid,
 			Envelope:    msg.Envelope,
-			Body:        "", // Body will be fetched later
+			Body:        "",
 			MailboxName: mailboxName,
 		}
 		result = append(result, serializableMsg)
@@ -152,8 +154,9 @@ func FetchEmailBody(c *client.Client, uid uint32) (string, error) {
 		return "", fmt.Errorf("server didn't return message body")
 	}
 
-	// Parse the email message using go-message
-	emailMsg, err := message.Read(r)
+	// Wrap the reader with a larger buffer
+	bufferedReader := bufio.NewReaderSize(r, 128*1024) // 128 KB buffer
+	emailMsg, err := message.Read(bufferedReader)
 	if err != nil {
 		log.Println("Error parsing email message:", err)
 		return "", err
@@ -183,13 +186,15 @@ func extractEmailBody(entity *message.Entity) (string, error) {
 		if mr == nil {
 			return "", fmt.Errorf("error reading multipart message")
 		}
+
 		for {
 			part, err := mr.NextPart()
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
-				return "", err
+				log.Printf("Error reading multipart part: %v", err)
+				continue
 			}
 
 			contentType := part.Header.Get("Content-Type")
@@ -197,6 +202,7 @@ func extractEmailBody(entity *message.Entity) (string, error) {
 
 			content, err := decodeEmailPart(part)
 			if err != nil {
+				log.Printf("Error decoding email part: %v", err)
 				continue
 			}
 
@@ -245,7 +251,8 @@ func init() {
 		case "utf-8", "us-ascii", "ascii":
 			return input, nil
 		default:
-			return charset.Reader(inputCharset, input)
+			log.Printf("Unknown charset: %s, falling back to UTF-8", inputCharset)
+			return charset.Reader("utf-8", input)
 		}
 	}
 }
