@@ -1,6 +1,7 @@
 package wails_app
 
 import (
+	"database/sql"
 	"email_test_app/backend/auth"
 	"email_test_app/backend/mail"
 	"encoding/json"
@@ -52,6 +53,8 @@ func (a *App) UpdateMailboxes() {
 		log.Println("UpdateMailboxes: User not logged in.")
 		return
 	}
+
+	log.Println("Updating mailboxes")
 
 	// use a mutex to prevent multiple updates at the same time
 	if !mailboxUpdateMutex.TryLock() {
@@ -167,6 +170,8 @@ func (a *App) UpdateMessages(mailboxName string) {
 		return
 	}
 
+	log.Println("Updating messages for mailbox:", mailboxName)
+
 	// use a mutex to prevent multiple updates at the same time
 	if !messageUpdateMutex.TryLock() {
 		log.Println("UpdateMessages: Update already in progress.")
@@ -180,29 +185,60 @@ func (a *App) UpdateMessages(mailboxName string) {
 	if a.oauthToken != nil {
 		oauthConfig := auth.GmailOAuthConfig
 		_, err = mail.WithOAuthClient(a.imapUrl, a.emailAddr, a.oauthToken, oauthConfig, func(c *client.Client) error {
-			emails, err := mail.FetchEmailsForMailbox(c, mailboxName, 0, 100) // Adjust range as needed
+			messages, err = mail.FetchEmailsForMailbox(c, mailboxName, 0, 30) // Adjust range as needed
 			if err != nil {
 				return err
 			}
-			messages = emails
-			return nil
-		})
-	} else {
-		err = mail.WithClient(a.imapUrl, a.emailAddr, a.emailAppPassword, func(c *client.Client) error {
-			emails, err := mail.FetchEmailsForMailbox(c, mailboxName, 0, 100) // Adjust range as needed
-			if err != nil {
-				return err
-			}
-			for i, email := range emails {
+
+			// check if the messages are already in the database
+			for i, email := range messages {
+				exists, err := checkIfEmailExists(a.db, email.UID)
+				if err != nil {
+					log.Println("Error checking if email exists:", err)
+					continue
+				}
+				if exists {
+					// message already exists, skip
+					continue
+				}
+
 				email.Body, err = mail.FetchEmailBody(c, email.UID)
 				if err != nil {
 					log.Println("Error fetching email body:", err)
 					continue
 				}
-				emails[i] = email
+				messages[i] = email
 			}
 
-			messages = emails
+			return nil
+		})
+	} else {
+		err = mail.WithClient(a.imapUrl, a.emailAddr, a.emailAppPassword, func(c *client.Client) error {
+			messages, err = mail.FetchEmailsForMailbox(c, mailboxName, 0, 30) // Adjust range as needed
+			if err != nil {
+				return err
+			}
+
+			// check if the messages are already in the database
+			for i, email := range messages {
+				exists, err := checkIfEmailExists(a.db, email.UID)
+				if err != nil {
+					log.Println("Error checking if email exists:", err)
+					continue
+				}
+				if exists {
+					// message already exists, skip
+					continue
+				}
+
+				email.Body, err = mail.FetchEmailBody(c, email.UID)
+				if err != nil {
+					log.Println("Error fetching email body:", err)
+					continue
+				}
+				messages[i] = email
+			}
+
 			return nil
 		})
 	}
@@ -220,8 +256,8 @@ func (a *App) UpdateMessages(mailboxName string) {
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-        INSERT OR REPLACE INTO messages (mailbox_name, uid, envelope, body, received_at, last_updated) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO messages (mailbox_name, uid, envelope, body_plain, body_html, body_raw, received_at, last_updated) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
 	if err != nil {
 		log.Println("Error preparing statement to insert messages:", err)
@@ -236,7 +272,7 @@ func (a *App) UpdateMessages(mailboxName string) {
 			continue
 		}
 
-		_, err = stmt.Exec(mailboxName, msg.UID, envelopeData, msg.Body, time.Now(), time.Now())
+		_, err = stmt.Exec(mailboxName, msg.UID, envelopeData, msg.Body.Plain, msg.Body.HTML, nil, time.Now(), time.Now())
 		if err != nil {
 			log.Println("Error inserting message into database:", err)
 		}
@@ -248,4 +284,19 @@ func (a *App) UpdateMessages(mailboxName string) {
 	}
 
 	runtime.EventsEmit(a.ctx, "MessagesUpdated", mailboxName)
+}
+
+func checkIfEmailExists(db *sql.DB, uid uint32) (bool, error) {
+	var exists bool = false
+	var body_html, body_plain string
+	err := db.QueryRow("SELECT body_plain, body_html FROM messages WHERE uid = ?", uid).Scan(&body_plain, &body_html)
+	if err != nil {
+		return false, err
+	}
+
+	if body_html != "" || body_plain != "" {
+		exists = true
+	}
+
+	return exists, nil
 }

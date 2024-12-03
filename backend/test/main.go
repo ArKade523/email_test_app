@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	godotenv.Load()
+	godotenv.Load("../../.env")
 	client, err := mail.GetClient("imap.mail.me.com:993", "kade.angell@icloud.com", os.Getenv("APPLE_APP_SPECIFIC_PASSWORD"))
 	if err != nil {
 		panic(err)
@@ -22,13 +22,28 @@ func main() {
 	for m := range mailboxes {
 		if mailboxes[m].Name == "INBOX" {
 			fmt.Println("Reading from Mailbox:", mailboxes[m].Name)
-			messages, err := mail.FetchEmailsForMailbox(client, mailboxes[m].Name, 1, 10)
+			messages, err := mail.FetchEmailsForMailbox(client, mailboxes[m].Name, 1, 4)
 			if err != nil {
 				fmt.Printf("Error fetching messages: %v", err)
 				os.Exit(1)
 			}
 			for msg := range messages {
-				fmt.Println("Message:", messages[msg])
+				fmt.Println("Message Subject:", messages[msg].Envelope.Subject)
+				messageBody, err := mail.FetchEmailBody(client, messages[msg].UID)
+				if err != nil {
+					fmt.Printf("Error fetching email body: %v", err)
+					os.Exit(1)
+				}
+				if len(messageBody.HTML) > 100 {
+					fmt.Println("Message Body HTML:", messageBody.HTML[:100])
+				} else {
+					fmt.Println("Message Body HTML:", messageBody.HTML)
+				}
+				if len(messageBody.Plain) > 100 {
+					fmt.Println("Message Body Plain:", messageBody.Plain[:100])
+				} else {
+					fmt.Println("Message Body Plain:", messageBody.Plain)
+				}
 			}
 		} else {
 			fmt.Println("Skipping Mailbox:", mailboxes[m].Name)

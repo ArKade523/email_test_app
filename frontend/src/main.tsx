@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import Mail from './Mail'
 import './index.css'
 import Login from './Login'
+import { IsLoggedIn } from '../wailsjs/go/wails_app/App'
 
 export enum Pages {
     LOGIN = 'login',
@@ -17,6 +18,15 @@ function Main() {
         window.localStorage.setItem('page', page)
         setPage(page)
     }
+
+    useEffect(() => {
+        const init = async () => {
+            if (!await IsLoggedIn()) {
+                setPage(Pages.LOGIN)
+            }
+        }
+        init()
+    }, [])
 
     return (
         <div className={`${navigator.userAgent.includes('Chrome') && "bg-black"}`}>

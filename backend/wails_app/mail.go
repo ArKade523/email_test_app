@@ -56,7 +56,7 @@ func (a *App) GetEmailsForMailbox(mailboxName string, start, limit uint32) []mai
 		}
 
 		msg.MailboxName = mailboxName
-		msg.Body = "" // Ensure the body is not sent to the frontend
+		msg.Body = mail.EmailBody{}
 		messages = append(messages, msg)
 	}
 
@@ -72,7 +72,7 @@ func (a *App) GetEmailBody(mailboxName string, seqNum uint32) string {
 	}
 
 	rows, err := a.db.Query(`
-		SELECT body FROM messages
+		SELECT body_plain, body_html FROM messages
 		WHERE mailbox_name = ? AND uid = ?
 		LIMIT 1
 	`, mailboxName, seqNum)
@@ -83,13 +83,22 @@ func (a *App) GetEmailBody(mailboxName string, seqNum uint32) string {
 	}
 	defer rows.Close()
 
-	var body string
+	var body_plain string
+	var body_html string
 	if rows.Next() {
-		if err := rows.Scan(&body); err != nil {
+		if err := rows.Scan(&body_plain, &body_html); err != nil {
 			log.Println("Error scanning email body row:", err)
 			return ""
 		}
 	}
 
-	return body
+	if body_html != "" {
+		return body_html
+	}
+
+	if body_plain != "" {
+		return body_plain
+	}
+
+	return "Error retrieving email body"
 }

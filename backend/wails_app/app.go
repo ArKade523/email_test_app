@@ -3,6 +3,7 @@ package wails_app
 import (
 	"context"
 	"database/sql"
+	"email_test_app/backend/db"
 	"email_test_app/backend/mail"
 	"log"
 	"net/http"
@@ -39,6 +40,12 @@ type App struct {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
+}
+
+func (a *App) InitDB(dbPath string) error {
+	var err error
+	a.db, err = db.InitDB(dbPath)
+	return err
 }
 
 func (a *App) LoginUserWithOAuth(providerName string) bool {

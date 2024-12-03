@@ -84,102 +84,100 @@ function Login({ setPage }: { setPage: (page: Pages) => void }) {
     }, []);
 
     // Step 1: Provider Selection
-    if (step === 1) {
-        return (
-            <div className="grid w-full h-screen place-items-center">
-                <div className="p-8 bg-white/20 rounded-lg text-center text-gray-100 drop-shadow-lg">
-                    <h2 className="text-xl mb-4">Select Your Email Provider</h2>
-                    {error && <span className="text-red-500">{error}</span>}
-                    <div className="flex flex-col gap-2">
-                        {emailProviders.map((provider) => (
-                            <button
-                                key={provider.name}
-                                className="relative transition ease-in-out duration-300 motion-reduce:transition-none focus:bg-blue-500 hover:bg-blue-500 bg-white/20 text-white p-2 rounded"
-                                onClick={() => clickProvider(provider)}
-                            >
-                                {provider.faIcon && <FontAwesomeIcon icon={provider.faIcon} className="mr-2 text-xl absolute left-4 top-[0.6rem]" />}
-                                {provider.name}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    return (
+        <div className="grid w-full h-screen place-items-center">
+            <div className="p-8 bg-white/20 rounded-lg text-center text-gray-100 drop-shadow-lg border-2 border-gray-400">
+                {step === 1 && (
+                    <>
+                        <h2 className="text-xl mb-4">Select Your Email Provider</h2>
+                        {error && <span className="text-red-500">{error}</span>}
+                        <div className="flex flex-col gap-2">
+                            {emailProviders.map((provider, index) => (
+                                <button
+                                    key={provider.name}
+                                    className="relative transition ease-in-out duration-300 motion-reduce:transition-none focus:outline-none focus:bg-blue-500 focus:border-blue-400 hover:bg-blue-500 hover:border-blue-400 bg-white/20 text-white p-2 drop-shadow-lg rounded border-2 border-gray-400"
+                                    onClick={() => clickProvider(provider)}
+                                    tabIndex={index + 1}
+                                >
+                                    {provider.faIcon && <FontAwesomeIcon icon={provider.faIcon} className="mr-2 text-xl absolute left-4 top-[0.6rem]" />}
+                                    {provider.name}
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+                {step === 2 && (
+                    <>
+                        <h2 className="text-xl mb-4">Enter Your Credentials</h2>
+                        {error && <span className="text-red-500 w-12">{error}</span>}
+                        <form 
+                            className="flex flex-col gap-4"
+                            onSubmit={handleSubmit}
+                        >
+                            {showCustomImap && (
+                                <input 
+                                    type="text" 
+                                    autoFocus
+                                    className="px-2 bg-white/10 py-1 rounded focus:outline-none focus:border-blue-400 focus:drop-shadow-xxl border-2 border-gray-400"
+                                    placeholder="IMAP URL" 
+                                    value={imapUrl} 
+                                    onChange={(e) => {
+                                        setError('');
+                                        setImapUrl(e.target.value);
+                                    }} 
+                                    required
+                                />
+                            )}
 
-    // Step 2: Credentials Entry
-    if (step === 2) {
-        return (
-            <div className="grid w-full h-screen place-items-center">
-                <div className="p-8 bg-white/20 rounded-lg text-center text-gray-100 drop-shadow-lg">
-                    <h2 className="text-xl mb-4">Enter Your Credentials</h2>
-                    {error && <span className="text-red-500 w-12">{error}</span>}
-                    <form 
-                        className="flex flex-col gap-4"
-                        onSubmit={handleSubmit}
-                    >
-                        {showCustomImap && (
                             <input 
-                                type="text" 
-                                className="px-2 bg-white/10 py-1 rounded focus:drop-shadow-xxl"
-                                placeholder="IMAP URL (e.g., imap.example.com:993)" 
-                                value={imapUrl} 
+                                type="email" 
+                                autoFocus={!showCustomImap}
+                                className="px-2 bg-white/10 py-1 rounded focus:outline-none focus:border-blue-400 focus:drop-shadow-xxl border-2 border-gray-400"
+                                placeholder="Email" 
+                                value={email} 
                                 onChange={(e) => {
                                     setError('');
-                                    setImapUrl(e.target.value);
-                                }} 
+                                    setEmail(e.target.value);
+                                }}
                                 required
                             />
-                        )}
-
-                        <input 
-                            type="email" 
-                            autoFocus
-                            className="px-2 bg-white/10 py-1 rounded focus:drop-shadow-xxl"
-                            placeholder="Email" 
-                            value={email} 
-                            onChange={(e) => {
+                            <input 
+                                type="password" 
+                                className="px-2 bg-white/10 py-1 rounded focus:outline-none focus:border-blue-400 focus:drop-shadow-xxl border-2 border-gray-400"
+                                placeholder="Password" 
+                                value={password} 
+                                onChange={(e) => {
+                                    setError('');
+                                    setPassword(e.target.value);
+                                }}
+                                required
+                            />
+                            <button 
+                                type="submit"
+                                className="transition ease-in-out duration-300 motion-reduce:transition-none focus:outline-none focus:bg-blue-500 focus:border-blue-400 hover:bg-blue-500 hover:border-blue-400 bg-white/20 text-white p-2 drop-shadow-lg rounded border-2 border-gray-400"
+                                tabIndex={0}
+                            >
+                                Login
+                            </button>
+                        </form>
+                        <button
+                            className="transition ease-in-out duration-300 motion-reduce:transition-none mt-4 text-sm text-gray-300 focus:outline-none focus:text-blue-400 focus:underline hover:text-blue-400 hover:underline"
+                            onClick={() => {
+                                setStep(1);
+                                setEmail('');
+                                setPassword('');
                                 setError('');
-                                setEmail(e.target.value);
                             }}
-                            required
-                        />
-                        <input 
-                            type="password" 
-                            className="px-2 bg-white/10 py-1 rounded focus:drop-shadow-xxl"
-                            placeholder="Password" 
-                            value={password} 
-                            onChange={(e) => {
-                                setError('');
-                                setPassword(e.target.value);
-                            }}
-                            required
-                        />
-                        <button 
-                            type="submit"
-                            className="transition ease-in-out duration-300 motion-reduce:transition-none focus:bg-blue-500 hover:bg-blue-500 bg-white/20 text-white p-1 rounded"
+                            tabIndex={0}
                         >
-                            Login
+                            <FontAwesomeIcon icon={faChevronLeft} className="mr-2" />
+                            Back to Provider Selection
                         </button>
-                    </form>
-                    <button
-                        className="transition ease-in-out duration-300 motion-reduce:transition-none mt-4 text-sm text-gray-300 hover:text-blue-400 hover:underline"
-                        onClick={() => {
-                            setStep(1);
-                            setEmail('');
-                            setPassword('');
-                            setError('');
-                        }}
-                    >
-                        <FontAwesomeIcon icon={faChevronLeft} className="mr-2" />
-                        Back to Provider Selection
-                    </button>
-                </div>
+                    </>
+                )}
             </div>
-        );
-    }
-
-    return null; // Just in case
+        </div>
+    )
 }
 
 export default Login;

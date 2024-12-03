@@ -191,14 +191,14 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                 </div>
                 <div className="flex flex-col gap-1">
                     <button 
-                        className="w-fit px-4 transition ease-in-out duration-300 motion-reduce:transition-none focus:bg-blue-500 hover:bg-blue-500 bg-white/20 text-white p-1 rounded"
+                        className="w-fit px-4 transition ease-in-out duration-300 motion-reduce:transition-none border-2 border-gray-400 focus:bg-blue-500 focus:border-blue-400 hover:border-blue-400 hover:bg-blue-500 bg-white/20 text-white p-1 rounded"
                         onClick={getMailboxes}
                         title="refresh"
                     >
                         <FontAwesomeIcon icon={faSync} />
                     </button>
                     <button 
-                        className="w-fit px-4 transition ease-in-out duration-300 motion-reduce:transition-none focus:bg-red-500 hover:bg-red-500 bg-white/20 text-white p-1 rounded"
+                        className="w-fit px-4 transition ease-in-out duration-300 motion-reduce:transition-none border-2 border-gray-400 focus:border-red-400  focus:bg-red-500 hover:bg-red-500 hover:border-red-400 bg-white/20 text-white p-1 rounded"
                         onClick={logOut}
                     >
                         Log out

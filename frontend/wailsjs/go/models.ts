@@ -72,10 +72,24 @@ export namespace imap {
 
 export namespace mail {
 	
+	export class EmailBody {
+	    plain: string;
+	    html: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EmailBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.plain = source["plain"];
+	        this.html = source["html"];
+	    }
+	}
 	export class SerializableMessage {
 	    uid: number;
 	    envelope?: imap.Envelope;
-	    body: string;
+	    body: EmailBody;
 	    mailbox_name: string;
 	
 	    static createFrom(source: any = {}) {
@@ -86,7 +100,7 @@ export namespace mail {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.uid = source["uid"];
 	        this.envelope = this.convertValues(source["envelope"], imap.Envelope);
-	        this.body = source["body"];
+	        this.body = this.convertValues(source["body"], EmailBody);
 	        this.mailbox_name = source["mailbox_name"];
 	    }
 	

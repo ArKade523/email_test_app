@@ -40,7 +40,9 @@ func createSchema(db *sql.DB) error {
 		mailbox_name TEXT NOT NULL,
 		uid INTEGER NOT NULL,
 		envelope BLOB NOT NULL,
-		body TEXT,
+		body_plain TEXT,
+		body_html TEXT,
+		body_raw BLOB,
 		received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(mailbox_name, uid)

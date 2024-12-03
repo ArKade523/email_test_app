@@ -14,6 +14,10 @@ export function GetMailboxes() {
   return window['go']['wails_app']['App']['GetMailboxes']();
 }
 
+export function InitDB(arg1) {
+  return window['go']['wails_app']['App']['InitDB'](arg1);
+}
+
 export function IsLoggedIn() {
   return window['go']['wails_app']['App']['IsLoggedIn']();
 }
