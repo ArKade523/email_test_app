@@ -8,8 +8,6 @@ export function GetEmailsForMailbox(arg1:string,arg2:number,arg3:number):Promise
 
 export function GetMailboxes():Promise<Array<string>>;
 
-export function InitDB(arg1:string):Promise<void>;
-
 export function IsLoggedIn():Promise<boolean>;
 
 export function LoginUser(arg1:string,arg2:string,arg3:string):Promise<boolean>;

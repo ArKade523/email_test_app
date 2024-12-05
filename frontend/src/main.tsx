@@ -1,3 +1,4 @@
+import './App.css'
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import Mail from './Mail'

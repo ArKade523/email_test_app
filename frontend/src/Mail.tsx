@@ -1,20 +1,19 @@
-import './App.css'
 import { useEffect, useRef, useState } from 'react'
-import { GetEmailsForMailbox, GetEmailBody, GetMailboxes, LogoutUser } from "../wailsjs/go/wails_app/App"
+import { GetEmailsForMailbox, GetEmailBody, GetMailboxes, LogoutUser, UpdateMailboxes, UpdateMessages } from "../wailsjs/go/wails_app/App"
 import { mail } from '../wailsjs/go/models'
 import { EventsOn } from '../wailsjs/runtime/runtime'
 import { Pages } from './main'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEnvelopeOpen, faFolderOpen, faSync, faTrashAlt, IconDefinition } from '@fortawesome/free-solid-svg-icons'
+import { faEnvelopeOpen, faFileContract, faFolderOpen, faRightFromBracket, faSync, faTrashAlt, IconDefinition } from '@fortawesome/free-solid-svg-icons'
 import { faEnvelope, faFile, faFolder, faPaperPlane, faTrashCan } from '@fortawesome/free-regular-svg-icons'
-import { faPaperPlane as faPaperPlaneSolid, faFile as faFileSolid } from '@fortawesome/free-solid-svg-icons'
+import { faPaperPlane as faPaperPlaneSolid } from '@fortawesome/free-solid-svg-icons'
 import { formatDate } from './utils/dateUtils'
 
 const knownMailboxIcons: { [key: string]: [IconDefinition, IconDefinition] } = {
     "INBOX": [faEnvelope, faEnvelopeOpen],
     "Sent": [faPaperPlane, faPaperPlaneSolid],
     "Trash": [faTrashCan, faTrashAlt],
-    "Drafts": [faFile, faFileSolid]
+    "Drafts": [faFile, faFileContract]
 }
 
 const NUM_EMAILS_TO_FETCH = 20
@@ -29,7 +28,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     const [mailLoading, setMailLoading] = useState<boolean>(false)
     const emailListRef = useRef<HTMLDivElement>(null)
 
-    const emailsPerInbox = useRef<{ [key: string]: number }>({})
+    const emailsPerInbox = useRef<{ [key: string]: mail.SerializableMessage[] }>({})
     
     const getMailboxes = async () => {
         setLoading(true)
@@ -80,20 +79,19 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     }
 
     const getEmails = async (mailbox: string) => {
-        if (selectedMailbox !== mailbox) {
-            setEmails([])
+        if (selectedMailbox === mailbox) {
+            return
         }
         setSelectedMailbox(mailbox)
-        const numEmails = emailsPerInbox.current[mailbox] || 0
-        const newEmails = await GetEmailsForMailbox(mailbox, numEmails, numEmails + NUM_EMAILS_TO_FETCH)
-        console.log(newEmails)
-        console.log(`Got ${newEmails?.length || "unknown"} emails for ${mailbox} from indices ${numEmails} to ${numEmails + NUM_EMAILS_TO_FETCH}`)
-        if (emails && emails.length > 0) {
-            setEmails([...emails, ...newEmails])
-        } else {
-            setEmails(newEmails)
+        if (!emailsPerInbox.current[mailbox]) {
+            emailsPerInbox.current[mailbox] = []
         }
-        emailsPerInbox.current[mailbox] = numEmails + NUM_EMAILS_TO_FETCH
+        const numEmails = emailsPerInbox.current[mailbox].length || 0
+        const newEmails = await GetEmailsForMailbox(mailbox, numEmails, numEmails + NUM_EMAILS_TO_FETCH)
+        if (newEmails) {
+            emailsPerInbox.current[mailbox].push(...newEmails)
+        }
+        setEmails(emailsPerInbox.current[mailbox])
     }
 
     const formatMailboxName = (mailbox: string) => {
@@ -115,6 +113,8 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
 
     useEffect(() => {
         getMailboxes()
+
+        emailsPerInbox.current = {}
 
         let unsubscribeFunctions = [] as (() => void)[]
 
@@ -169,7 +169,16 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
             }
             <div className="flex flex-col w-max px-4 justify-between h-[95vh] whitespace-nowrap">
                 <div className="flex flex-col w-max">
-                    <h2 className="font-bold text-xs text-gray-100 ml-2 select-none">Mailboxes</h2>
+                    <div className="flex justify-between px-2">
+                        <h2 className="font-bold text-xs text-gray-100 select-none">Mailboxes</h2>
+                        <button 
+                            className="transition ease-in-out duration-300 motion-reduce:transition-none hover:text-blue-500 text-gray-300 text-xs"
+                            onClick={UpdateMailboxes}
+                            title="Refresh Mailboxes"
+                        >
+                            <FontAwesomeIcon icon={faSync} />
+                        </button>
+                    </div>
                     <div className="w-max overflow-y-scroll">
                         <ul>
                             {mailboxes && mailboxes.map((mailbox, index) => (
@@ -191,21 +200,25 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                 </div>
                 <div className="flex flex-col gap-1">
                     <button 
-                        className="w-fit px-4 transition ease-in-out duration-300 motion-reduce:transition-none border-2 border-gray-400 focus:bg-blue-500 focus:border-blue-400 hover:border-blue-400 hover:bg-blue-500 bg-white/20 text-white p-1 rounded"
-                        onClick={getMailboxes}
-                        title="refresh"
-                    >
-                        <FontAwesomeIcon icon={faSync} />
-                    </button>
-                    <button 
-                        className="w-fit px-4 transition ease-in-out duration-300 motion-reduce:transition-none border-2 border-gray-400 focus:border-red-400  focus:bg-red-500 hover:bg-red-500 hover:border-red-400 bg-white/20 text-white p-1 rounded"
+                        className="w-fit px-2 text-xs transition ease-in-out duration-300 motion-reduce:transition-none border-2 border-gray-400 focus:border-red-400  focus:bg-red-500 hover:bg-red-500 hover:border-red-400 bg-white/20 text-white p-1 rounded"
                         onClick={logOut}
                     >
                         Log out
+                        <FontAwesomeIcon icon={faRightFromBracket} className="text-gray-300 ml-2" />
                     </button>
                 </div>
             </div>
             <div className="max-h-full overflow-y-scroll w-80 max-w-md">
+                <div className="flex justify-between px-2">
+                    <h2 className="font-bold text-xs text-gray-100 ml-2 select-none">Messages</h2>
+                    <button 
+                        className="transition ease-in-out duration-300 motion-reduce:transition-none hover:text-blue-500 text-gray-300 text-xs"
+                        onClick={() => UpdateMessages(selectedMailbox)}
+                        title="Refresh Messages"
+                    >
+                        <FontAwesomeIcon icon={faSync} />
+                    </button>
+                    </div>
                 <div className="flex flex-col px-1"
                     ref={emailListRef}
                 >
@@ -239,22 +252,20 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                                 <p className="font-light text-sm">{selectedEmail?.envelope?.Subject}</p>
                             </div>
                             <div className="text-gray-100 col-span-2 content-center">
-                                <p className="text-center">{formatDate(selectedEmail?.envelope?.Date)}</p>
+                                <p className="text-right text-sm select-none">{formatDate(selectedEmail?.envelope?.Date)}</p>
                             </div>
                         </div>
                     }
                     <div>
                         {
                             mailLoading  ?
-                            <div className="absolute w-full bg-gray-300/50 grid place-items-center h-[80vh]">
-                                <span className="text-gray-400 text-2xl font-bold font-mono drop-shadow-xl">
+                                <div className="text-gray-400 text-xl h-[80vh] text-center content-center select-none font-bold font-mono">
                                     Loading...
-                                </span>
-                            </div>
+                                </div>
                             : (
                             emailBody === '' ? (
-                                <div className="text-gray-400 text-xl font-bold font-mono">
-                                    No email selected
+                                <div className="text-gray-400 text-xl h-[80vh] text-center content-center select-none font-bold font-mono">
+                                    No message selected
                                 </div>
                             ) : (
                                 <div className="mt-2 bg-white p-4 overflow-x-scroll overflow-y-scroll">

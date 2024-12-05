@@ -1,9 +1,13 @@
 package wails_app
 
 import (
+	"email_test_app/backend/auth"
 	"email_test_app/backend/mail"
 	"encoding/json"
+	"fmt"
 	"log"
+
+	"github.com/emersion/go-imap/client"
 )
 
 func (a *App) GetMailboxes() []string {
@@ -64,7 +68,7 @@ func (a *App) GetEmailsForMailbox(mailboxName string, start, limit uint32) []mai
 }
 
 // GetEmailBody fetches the body of an email, using cache if available
-func (a *App) GetEmailBody(mailboxName string, seqNum uint32) string {
+func (a *App) GetEmailBody(mailboxName string, uid uint32) string {
 	if !a.IsLoggedIn() {
 		log.Println("GetEmailBody: User not logged in.")
 		a.LogoutUser()
@@ -72,10 +76,10 @@ func (a *App) GetEmailBody(mailboxName string, seqNum uint32) string {
 	}
 
 	rows, err := a.db.Query(`
-		SELECT body_plain, body_html FROM messages
-		WHERE mailbox_name = ? AND uid = ?
-		LIMIT 1
-	`, mailboxName, seqNum)
+        SELECT body_plain, body_html FROM messages
+        WHERE mailbox_name = ? AND uid = ?
+        LIMIT 1
+    `, mailboxName, uid)
 
 	if err != nil {
 		log.Println("Error querying email body from database:", err)
@@ -88,6 +92,56 @@ func (a *App) GetEmailBody(mailboxName string, seqNum uint32) string {
 	if rows.Next() {
 		if err := rows.Scan(&body_plain, &body_html); err != nil {
 			log.Println("Error scanning email body row:", err)
+			return ""
+		}
+	}
+
+	fetchBody := func(c *client.Client, bodyPlainPtr *string, bodyHtmlPtr *string) error {
+		_, err := c.Select(mailboxName, false)
+		if err != nil {
+			return fmt.Errorf("error selecting mailbox: %v", err)
+		}
+		body, err := mail.FetchEmailBody(c, uid)
+		if err != nil {
+			return fmt.Errorf("error fetching email body: %v", err)
+		}
+
+		*bodyHtmlPtr = body.HTML
+		*bodyPlainPtr = body.Plain
+
+		return nil
+	}
+
+	if body_plain == "" && body_html == "" {
+		log.Println("Email body not found in cache, fetching from server.")
+
+		if a.oauthToken != nil {
+			oauthConfig := auth.GmailOAuthConfig
+			mail.WithOAuthClient(a.imapUrl, a.emailAddr, a.oauthToken, oauthConfig, func(c *client.Client) error {
+				return fetchBody(c, &body_plain, &body_html)
+			})
+		} else if a.emailAppPassword != "" {
+			mail.WithClient(a.imapUrl, a.emailAddr, a.emailAppPassword, func(c *client.Client) error {
+				return fetchBody(c, &body_plain, &body_html)
+			})
+		} else {
+			log.Println("No valid credentials found.")
+			return ""
+		}
+
+		if body_html == "" && body_plain == "" {
+			log.Println("Error fetching email body.")
+			return ""
+		}
+
+		// Update the cache
+		_, err := a.db.Exec(`
+            UPDATE messages
+            SET body_plain = ?, body_html = ?
+            WHERE mailbox_name = ? AND uid = ?
+        `, body_plain, body_html, mailboxName, uid)
+		if err != nil {
+			log.Println("Error updating email body in cache:", err)
 			return ""
 		}
 	}
