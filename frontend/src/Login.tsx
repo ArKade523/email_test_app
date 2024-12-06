@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import { EventsOn } from "../wailsjs/runtime/runtime";
 
-function Login({ setPage }: { setPage: (page: Pages) => void }) {
+function Login({ accountIds, setAccountIds, setPage }: { accountIds: number[], setAccountIds: (accountIds: number[]) => void, setPage: (page: Pages) => void }) {
     const [step, setStep] = useState(1);
     const [selectedProvider, setSelectedProvider] = useState<EmailProvider | null>(null);
     const [showCustomImap, setShowCustomImap] = useState(false);
@@ -53,8 +53,9 @@ function Login({ setPage }: { setPage: (page: Pages) => void }) {
             return;
         }
 
-        const success = await LoginUser(imapUrlToUse, email, password);
-        if (success) {
+        const newAccountId = await LoginUser(imapUrlToUse, email, password);
+        if (newAccountId >= 0) {
+            setAccountIds([...accountIds, newAccountId]);
             setPage(Pages.MAIL);
         } else {
             setError('Invalid credentials');
@@ -64,14 +65,13 @@ function Login({ setPage }: { setPage: (page: Pages) => void }) {
     useEffect(() => {
         let unsubscribeFunctions: (() => void)[] = [];
         // Set up event listener for OAuthSuccess
-        unsubscribeFunctions.push(EventsOn("OAuthSuccess", () => {
-            console.log("Received OAuthSuccess event");
+        unsubscribeFunctions.push(EventsOn("OAuthSuccess", (newAccountId) => {
+            setAccountIds([...accountIds, newAccountId]);
             setPage(Pages.MAIL);
         }))
 
         // Optionally, handle OAuthFailure if you emit it
         unsubscribeFunctions.push(EventsOn("OAuthFailure", () => {
-            console.log("Received OAuthFailure event");
             setError("OAuth login failed.");
         }))
 

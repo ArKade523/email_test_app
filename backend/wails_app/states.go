@@ -36,6 +36,14 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 
+	// pull the accounts from the database
+	a.accounts, err = db.GetAccounts(a.db)
+	if err != nil {
+		log.Println("Error getting accounts from database:", err)
+	}
+
+	log.Println("Pulled accounts from database:", a.accounts)
+
 	go a.startHTTPServer()
 }
 
@@ -52,7 +60,10 @@ func (a *App) BeforeClose(ctx context.Context) (prevent bool) {
 // shutdown is called at application termination
 func (a *App) Shutdown(ctx context.Context) {
 	// Perform your teardown here
-	a.LogoutUser()
+	for _, account := range a.accounts {
+		a.endUpdateLoops(account.Id)
+		a.LogoutUser(account.Id)
+	}
 
 	// Shutdown the HTTP server
 	if a.httpServer != nil {

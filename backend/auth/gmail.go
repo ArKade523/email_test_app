@@ -10,6 +10,8 @@ import (
 
 var GmailOAuthConfig *oauth2.Config
 
+const GmailImapUrl = "imap.gmail.com:993"
+
 func init() {
 	// Load environment variables
 	godotenv.Load()

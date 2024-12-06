@@ -18,6 +18,7 @@ func (a *App) StartOAuth(providerName string) error {
 	var oauthConfig *oauth2.Config
 	var codeVerifier string
 	var err error
+	var newAccount auth.Account
 
 	switch providerName {
 	case "Gmail":
@@ -51,8 +52,9 @@ func (a *App) StartOAuth(providerName string) error {
 		return err
 	}
 
-	// Store the token
-	a.oauthToken = token
+	newAccount.OAuthAccessToken = token.AccessToken
+	newAccount.OAuthRefreshToken = token.RefreshToken
+	newAccount.OAuthExpiry = token.Expiry.Unix()
 
 	// Get the user's email address
 	client := oauthConfig.Client(context.Background(), token)
@@ -74,11 +76,18 @@ func (a *App) StartOAuth(providerName string) error {
 		return err
 	}
 
-	a.emailAddr = userInfo.Email
-	a.imapUrl = "imap.gmail.com:993"
+	newAccount.Email = userInfo.Email
+	switch providerName {
+	case "Gmail":
+		newAccount.ImapUrl = auth.GmailImapUrl
+	default:
+		return fmt.Errorf("unsupported provider for OAuth")
+	}
+
+	a.updateAccounts(&newAccount)
 
 	// Emit an event to the frontend to proceed
-	runtime.EventsEmit(a.ctx, "OAuthSuccess", nil)
+	runtime.EventsEmit(a.ctx, "OAuthSuccess", newAccount.Id)
 
 	return nil
 }

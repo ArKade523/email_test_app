@@ -2,6 +2,9 @@ package db
 
 import (
 	"database/sql"
+	"email_test_app/backend/auth"
+	"fmt"
+	"log"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -29,23 +32,51 @@ func InitDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
+func GetAccounts(db *sql.DB) (map[int64]auth.Account, error) {
+	rows, err := db.Query("SELECT * FROM accounts")
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts = make(map[int64]auth.Account)
+
+	for rows.Next() {
+		var account auth.Account
+		var createdAt string
+		if err := rows.Scan(&account.Id, &account.Email, &account.ImapUrl, &account.OAuthAccessToken, &account.OAuthRefreshToken, &account.OAuthExpiry, &account.AppSpecificPassword, &createdAt); err != nil {
+			return nil, fmt.Errorf("error scanning account row: %w", err)
+		}
+		log.Println("Pulled account from DB:", account)
+		accounts[account.Id] = account
+	}
+
+	return accounts, nil
+}
+
 func createSchema(db *sql.DB) error {
 	schema := `
     CREATE TABLE IF NOT EXISTS accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
-        password TEXT,
+		imap_url TEXT NOT NULL,
+		oauth_access_token TEXT,
+		oauth_refresh_token TEXT,
+		oauth_expiry INTEGER,
+		app_specific_password TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS mailboxes (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		account_id INTEGER NOT NULL,
 		name TEXT NOT NULL UNIQUE
 	);
 
 	CREATE TABLE IF NOT EXISTS messages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		mailbox_name TEXT NOT NULL,
+		account_id INTEGER NOT NULL,
 		uid INTEGER NOT NULL,
 		envelope BLOB NOT NULL,
 		body_plain TEXT,

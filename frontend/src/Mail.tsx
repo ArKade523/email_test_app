@@ -16,11 +16,13 @@ const knownMailboxIcons: { [key: string]: [IconDefinition, IconDefinition] } = {
     "Drafts": [faFile, faFileContract]
 }
 
+type MailboxByAccount = [accountId: number, mailbox: string]
+
 const NUM_EMAILS_TO_FETCH = 20
 
-function Mail({setPage}: {setPage: (page: Pages) => void}) {
-    const [mailboxes, setMailboxes] = useState<string[] | null>(['INBOX'])
-    const [selectedMailbox, setSelectedMailbox] = useState<string>('')
+function Mail({accounts, setPage}: {accounts: number[], setPage: (page: Pages) => void}) {
+    const [mailboxes, setMailboxes] = useState<MailboxByAccount[]>([])
+    const [selectedMailboxIndex, setSelectedMailboxIndex] = useState<number>(-1)
     const [emails, setEmails] = useState<mail.SerializableMessage[] | null>([])
     const [emailBody, setEmailBody] = useState<string>('')
     const [selectedEmail, setSelectedEmail] = useState<mail.SerializableMessage | null>(null)
@@ -32,33 +34,37 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
     
     const getMailboxes = async () => {
         setLoading(true)
-        const newMailboxes = await GetMailboxes()
-        if (newMailboxes && newMailboxes.length > 0) {
-            if (newMailboxes.includes('INBOX')) {
-                setSelectedMailbox('INBOX')
-                getEmails('INBOX')
+        for (const accountId of accounts) {
+            const newMailboxes = await GetMailboxes(accountId)
+            if (newMailboxes && newMailboxes.length > 0) {
+                
+                // Sort the mailboxes so that mailboxes in the knownMailboxIcons object are displayed first
+                const knownMailboxes = Object.keys(knownMailboxIcons)
+                const sortedMailboxes = newMailboxes.sort((a, b) => {
+                    if (knownMailboxes.includes(a) && knownMailboxes.includes(b)) {
+                        return knownMailboxes.indexOf(a) - knownMailboxes.indexOf(b)
+                    } else if (knownMailboxes.includes(a)) {
+                        return -1
+                    } else if (knownMailboxes.includes(b)) {
+                        return 1
+                    }
+                    return a.localeCompare(b)
+                })
+                
+                const mailboxesWithId = sortedMailboxes.map((mailbox) => [accountId, mailbox] as MailboxByAccount)
+                
+                setMailboxes([...mailboxes, ...mailboxesWithId])
+            } 
+            if (mailboxes.length > 0) {
+                setSelectedMailboxIndex(0)
+                getEmails(selectedMailboxIndex)
             }
-
-            // Sort the mailboxes so that mailboxes in the knownMailboxIcons object are displayed first
-            const knownMailboxes = Object.keys(knownMailboxIcons)
-            const sortedMailboxes = newMailboxes.sort((a, b) => {
-                if (knownMailboxes.includes(a) && knownMailboxes.includes(b)) {
-                    return knownMailboxes.indexOf(a) - knownMailboxes.indexOf(b)
-                } else if (knownMailboxes.includes(a)) {
-                    return -1
-                } else if (knownMailboxes.includes(b)) {
-                    return 1
-                }
-                return a.localeCompare(b)
-            })
-
-            setMailboxes(sortedMailboxes)
-        } 
+        }
 
         setLoading(false)
     };
 
-    const handleEmailClick = async (email: mail.SerializableMessage) => {
+    const handleEmailClick = async (accountId: number, email: mail.SerializableMessage) => {
         if (selectedEmail === email) {
             return
         }
@@ -68,47 +74,48 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
         setMailLoading(true)
         setEmailBody('')
         setSelectedEmail(email || null);
-        setEmailBody(await GetEmailBody(email.mailbox_name, email.uid))
+        setEmailBody(await GetEmailBody(accountId, email.mailbox_name, email.uid))
         setMailLoading(false)
     }
 
-    const logOut = async () => {
-        await LogoutUser()
+    const logOut = async (accountId: number) => {
+        await LogoutUser(accountId)
         console.log('Logged out')
         setPage(Pages.LOGIN)
     }
 
-    const getEmails = async (mailbox: string) => {
-        if (selectedMailbox === mailbox) {
+    const getEmails = async (mailboxIndex: number) => {
+        if (selectedMailboxIndex === mailboxIndex) {
             return
         }
-        setSelectedMailbox(mailbox)
-        if (!emailsPerInbox.current[mailbox]) {
-            emailsPerInbox.current[mailbox] = []
+        setSelectedMailboxIndex(mailboxIndex)
+        if (!emailsPerInbox.current[mailboxIndex]) {
+            emailsPerInbox.current[mailboxIndex] = []
         }
-        const numEmails = emailsPerInbox.current[mailbox].length || 0
-        const newEmails = await GetEmailsForMailbox(mailbox, numEmails, numEmails + NUM_EMAILS_TO_FETCH)
+        const numEmails = emailsPerInbox.current[mailboxIndex].length || 0
+        const mailbox = mailboxes[mailboxIndex]
+        const newEmails = await GetEmailsForMailbox(mailbox[0], mailbox[1], numEmails, numEmails + NUM_EMAILS_TO_FETCH)
         if (newEmails) {
-            emailsPerInbox.current[mailbox].push(...newEmails)
+            emailsPerInbox.current[mailboxIndex].push(...newEmails)
         }
-        setEmails(emailsPerInbox.current[mailbox])
+        setEmails(emailsPerInbox.current[mailboxIndex])
     }
 
-    const formatMailboxName = (mailbox: string) => {
-        if (mailbox === 'INBOX') {
+    const formatMailboxName = (mailbox: MailboxByAccount) => {
+        if (mailbox[1] === 'INBOX') {
             return 'Inbox'
         }
-        if (mailbox.includes('[Gmail]/')) {
-            return mailbox.replace('[Gmail]/', '')
+        if (mailbox[1].includes('[Gmail]/')) {
+            return mailbox[1].replace('[Gmail]/', '')
         }
         if (mailbox.includes('[Gmail]')) {
-            if (mailbox === '[Gmail]') {
+            if (mailbox[1] === '[Gmail]') {
                 const newMailboxes = mailboxes?.filter((m) => m !== mailbox) || []
                 setMailboxes(newMailboxes)
             }
-            return mailbox.replace('[Gmail]', '')
+            return mailbox[1].replace('[Gmail]', '')
         }
-        return mailbox
+        return mailbox[1]
     }
 
     useEffect(() => {
@@ -125,8 +132,8 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
             getMailboxes()
         }))
         unsubscribeFunctions.push(EventsOn("MessagesUpdated", (mailboxName: string) => {
-            if (selectedMailbox === mailboxName) {
-                getEmails(mailboxName)
+            if (mailboxes[selectedMailboxIndex][1] === mailboxName) {
+                getEmails(selectedMailboxIndex)
             }
         }))
 
@@ -142,7 +149,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
             if (emailListRef.current) {
                 const { scrollTop, scrollHeight, clientHeight } = emailListRef.current
                 if (scrollTop + clientHeight >= scrollHeight) {
-                    getEmails(selectedMailbox)
+                    getEmails(selectedMailboxIndex)
                 }
             }
             console.log('Scrolled')
@@ -155,7 +162,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                 emailListElement.removeEventListener('scroll', handleMailListScroll);
             };
         }
-    }, [emailListRef, selectedMailbox])
+    }, [emailListRef, selectedMailboxIndex])
 
     
     return (
@@ -173,7 +180,10 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                         <h2 className="font-bold text-xs text-gray-100 select-none">Mailboxes</h2>
                         <button 
                             className="transition ease-in-out duration-300 motion-reduce:transition-none hover:text-blue-500 text-gray-300 text-xs"
-                            onClick={UpdateMailboxes}
+                            onClick={() => {
+                                for (const accountId of accounts) {
+                                    UpdateMailboxes(accountId)
+                                }}}
                             title="Refresh Mailboxes"
                         >
                             <FontAwesomeIcon icon={faSync} />
@@ -183,13 +193,13 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                         <ul>
                             {mailboxes && mailboxes.map((mailbox, index) => (
                                 <li key={index} 
-                                    className={`${selectedMailbox === mailbox ? "bg-blue-700 rounded" : ""} text-gray-100 px-2 py-0.5 cursor-pointer select-none text-sm w-fill`}
-                                    onClick={() => {getEmails(mailbox)}}
+                                    className={`${selectedMailboxIndex === index ? "bg-blue-700 rounded" : ""} text-gray-100 px-2 py-0.5 cursor-pointer select-none text-sm w-fill`}
+                                    onClick={() => {getEmails(index)}}
                                 >
                                     <FontAwesomeIcon 
-                                        icon={selectedMailbox === mailbox ? 
-                                            knownMailboxIcons[mailbox] ? knownMailboxIcons[mailbox][1] : faFolderOpen : 
-                                            knownMailboxIcons[mailbox] ? knownMailboxIcons[mailbox][0] : faFolder} 
+                                        icon={selectedMailboxIndex === index ? 
+                                            knownMailboxIcons[mailboxes[index][1]] ? knownMailboxIcons[mailboxes[index][1]][1] : faFolderOpen : 
+                                            knownMailboxIcons[mailboxes[index][1]] ? knownMailboxIcons[mailboxes[index][1]][0] : faFolder} 
                                         className="text-gray-300 mr-2" 
                                     />
                                     {formatMailboxName(mailbox)}
@@ -201,7 +211,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                 <div className="flex flex-col gap-1">
                     <button 
                         className="w-fit px-2 text-xs transition ease-in-out duration-300 motion-reduce:transition-none border-2 border-gray-400 focus:border-red-400  focus:bg-red-500 hover:bg-red-500 hover:border-red-400 bg-white/20 text-white p-1 rounded"
-                        onClick={logOut}
+                        // onClick={logOut}
                     >
                         Log out
                         <FontAwesomeIcon icon={faRightFromBracket} className="text-gray-300 ml-2" />
@@ -213,7 +223,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                     <h2 className="font-bold text-xs text-gray-100 ml-2 select-none">Messages</h2>
                     <button 
                         className="transition ease-in-out duration-300 motion-reduce:transition-none hover:text-blue-500 text-gray-300 text-xs"
-                        onClick={() => UpdateMessages(selectedMailbox)}
+                        onClick={() => UpdateMessages(...mailboxes[selectedMailboxIndex])}
                         title="Refresh Messages"
                     >
                         <FontAwesomeIcon icon={faSync} />
@@ -226,7 +236,7 @@ function Mail({setPage}: {setPage: (page: Pages) => void}) {
                     emails.map((email, index) => (
                         <div key={index} className="flex flex-col">
                             <div className={`${selectedEmail === email ? "bg-blue-700 rounded" : ""} text-xs py-2 px-4 text-gray-100 cursor-pointer select-none`}
-                                onClick={() => handleEmailClick(email)}
+                                onClick={() => handleEmailClick(mailboxes[selectedMailboxIndex][0], email)}
                             >
                                 <p className="font-bold overflow-x-hidden overflow-ellipsis whitespace-nowrap">{email.envelope?.Sender?.[0]?.PersonalName || "Unknown Sender"}</p>
                                 <p className="overflow-x-hidden overflow-ellipsis whitespace-nowrap">{email.envelope?.Subject}</p>

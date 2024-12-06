@@ -6,12 +6,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/emersion/go-imap/client"
+	"golang.org/x/oauth2"
 )
 
-func (a *App) GetMailboxes() []string {
-	rows, err := a.db.Query("SELECT name FROM mailboxes")
+func (a *App) GetMailboxes(accountId int64) []string {
+	if !a.IsLoggedIn(accountId) {
+		log.Println("GetMailboxes: User not logged in.")
+		a.LogoutUser(accountId)
+		return nil
+	}
+
+	rows, err := a.db.Query("SELECT name FROM mailboxes WHERE account_id = ?", accountId)
 	if err != nil {
 		log.Println("Error querying mailboxes from database:", err)
 		return nil
@@ -32,12 +40,18 @@ func (a *App) GetMailboxes() []string {
 }
 
 // GetEmailsForMailbox returns emails for a mailbox, using cache if available
-func (a *App) GetEmailsForMailbox(mailboxName string, start, limit uint32) []mail.SerializableMessage {
+func (a *App) GetEmailsForMailbox(accountId int64, mailboxName string, start, limit uint32) []mail.SerializableMessage {
+	if !a.IsLoggedIn(accountId) {
+		log.Println("GetEmailsForMailbox: User not logged in.")
+		a.LogoutUser(accountId)
+		return nil
+	}
+
 	rows, err := a.db.Query(`
         SELECT uid, envelope FROM messages 
-        WHERE mailbox_name = ? 
+        WHERE mailbox_name = ? AND account_id = ?
         ORDER BY received_at DESC 
-        LIMIT ? OFFSET ?`, mailboxName, limit, start)
+        LIMIT ? OFFSET ?`, mailboxName, accountId, limit, start)
 	if err != nil {
 		log.Println("Error querying messages from database:", err)
 		return nil
@@ -68,18 +82,24 @@ func (a *App) GetEmailsForMailbox(mailboxName string, start, limit uint32) []mai
 }
 
 // GetEmailBody fetches the body of an email, using cache if available
-func (a *App) GetEmailBody(mailboxName string, uid uint32) string {
-	if !a.IsLoggedIn() {
+func (a *App) GetEmailBody(accountId int64, mailboxName string, uid uint32) string {
+	if !a.IsLoggedIn(accountId) {
 		log.Println("GetEmailBody: User not logged in.")
-		a.LogoutUser()
+		a.LogoutUser(accountId)
+		return ""
+	}
+
+	account, ok := a.accounts[accountId]
+	if !ok {
+		log.Println("Account not found for ID:", accountId)
 		return ""
 	}
 
 	rows, err := a.db.Query(`
         SELECT body_plain, body_html FROM messages
-        WHERE mailbox_name = ? AND uid = ?
+        WHERE mailbox_name = ? AND uid = ? AND account_id = ?
         LIMIT 1
-    `, mailboxName, uid)
+    `, mailboxName, uid, accountId)
 
 	if err != nil {
 		log.Println("Error querying email body from database:", err)
@@ -115,13 +135,21 @@ func (a *App) GetEmailBody(mailboxName string, uid uint32) string {
 	if body_plain == "" && body_html == "" {
 		log.Println("Email body not found in cache, fetching from server.")
 
-		if a.oauthToken != nil {
+		if account.OAuthAccessToken != "" {
 			oauthConfig := auth.GmailOAuthConfig
-			mail.WithOAuthClient(a.imapUrl, a.emailAddr, a.oauthToken, oauthConfig, func(c *client.Client) error {
-				return fetchBody(c, &body_plain, &body_html)
-			})
-		} else if a.emailAppPassword != "" {
-			mail.WithClient(a.imapUrl, a.emailAddr, a.emailAppPassword, func(c *client.Client) error {
+			mail.WithOAuthClient(account.ImapUrl,
+				account.Email,
+				&oauth2.Token{
+					AccessToken:  account.OAuthAccessToken,
+					RefreshToken: account.OAuthRefreshToken,
+					Expiry:       time.Unix(account.OAuthExpiry, 0),
+				},
+				oauthConfig,
+				func(c *client.Client) error {
+					return fetchBody(c, &body_plain, &body_html)
+				})
+		} else if account.AppSpecificPassword != "" {
+			mail.WithClient(account.ImapUrl, account.Email, account.AppSpecificPassword, func(c *client.Client) error {
 				return fetchBody(c, &body_plain, &body_html)
 			})
 		} else {

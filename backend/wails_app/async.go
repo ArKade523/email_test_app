@@ -14,6 +14,7 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/oauth2"
 )
 
 func (a *App) startUpdateLoops() {
@@ -22,9 +23,11 @@ func (a *App) startUpdateLoops() {
 
 	// Run once, immediately
 	go func() {
-		a.UpdateMailboxes()
-		for _, mailbox := range a.GetMailboxes() {
-			a.UpdateMessages(mailbox)
+		for _, account := range a.accounts {
+			a.UpdateMailboxes(account.Id)
+			for _, mailbox := range a.GetMailboxes(account.Id) {
+				a.UpdateMessages(account.Id, mailbox)
+			}
 		}
 	}()
 
@@ -44,15 +47,15 @@ func (a *App) startUpdateLoops() {
 	// }()
 }
 
-func (a *App) endUpdateLoops() {
+func (a *App) endUpdateLoops(accountId int64) {
 	a.mailboxUpdateTicker.Stop()
 	a.emailUpdateTicker.Stop()
 }
 
 var mailboxUpdateMutex sync.Mutex
 
-func (a *App) UpdateMailboxes() {
-	if !a.IsLoggedIn() {
+func (a *App) UpdateMailboxes(accountId int64) {
+	if !a.IsLoggedIn(accountId) {
 		log.Println("UpdateMailboxes: User not logged in.")
 		return
 	}
@@ -81,11 +84,25 @@ func (a *App) UpdateMailboxes() {
 		return nil
 	}
 
-	if a.oauthToken != nil {
-		oauthConfig := auth.GmailOAuthConfig
-		_, err = mail.WithOAuthClient(a.imapUrl, a.emailAddr, a.oauthToken, oauthConfig, fetchMailboxes)
+	account, ok := a.accounts[accountId]
+	if !ok {
+		log.Println("Account not found for ID:", accountId)
+		return
+	}
+
+	if account.OAuthAccessToken != "" {
+		oauthConfig := auth.GmailOAuthConfig // TODO: Add support for other OAuth providers
+		_, err = mail.WithOAuthClient(account.ImapUrl,
+			account.Email,
+			&oauth2.Token{
+				AccessToken:  account.OAuthAccessToken,
+				RefreshToken: account.OAuthRefreshToken,
+				Expiry:       time.Unix(account.OAuthExpiry, 0),
+			},
+			oauthConfig,
+			fetchMailboxes)
 	} else {
-		err = mail.WithClient(a.imapUrl, a.emailAddr, a.emailAppPassword, fetchMailboxes)
+		err = mail.WithClient(account.ImapUrl, account.Email, account.AppSpecificPassword, fetchMailboxes)
 	}
 
 	if err != nil {
@@ -102,7 +119,7 @@ func (a *App) UpdateMailboxes() {
 
 	// check if the existing mailboxes are the same as the new ones
 	mailboxesMatch := true
-	existingMailboxes := a.GetMailboxes()
+	existingMailboxes := a.GetMailboxes(accountId)
 	if len(existingMailboxes) == len(mailboxes) {
 		for _, name := range mailboxes {
 			nameFound := false
@@ -129,7 +146,7 @@ func (a *App) UpdateMailboxes() {
 			return
 		}
 
-		stmt, err := tx.Prepare("INSERT INTO mailboxes (name) VALUES (?)")
+		stmt, err := tx.Prepare("INSERT INTO mailboxes (name, account_id) VALUES (?, ?)")
 		if err != nil {
 			log.Println("Error preparing statement to insert mailboxes:", err)
 			return
@@ -137,7 +154,7 @@ func (a *App) UpdateMailboxes() {
 		defer stmt.Close()
 
 		for _, name := range mailboxes {
-			_, err = stmt.Exec(name)
+			_, err = stmt.Exec(name, accountId)
 			if err != nil {
 				log.Println("Error inserting mailbox:", err)
 			}
@@ -148,7 +165,7 @@ func (a *App) UpdateMailboxes() {
 			return
 		}
 
-		mailboxesFromDB := a.GetMailboxes()
+		mailboxesFromDB := a.GetMailboxes(accountId)
 		log.Println("Mailboxes updated:", mailboxesFromDB)
 
 		runtime.EventsEmit(a.ctx, "MailboxesUpdated")
@@ -159,9 +176,15 @@ func (a *App) UpdateMailboxes() {
 
 var messageUpdateMutex sync.Mutex
 
-func (a *App) UpdateMessages(mailboxName string) {
-	if !a.IsLoggedIn() {
+func (a *App) UpdateMessages(accountId int64, mailboxName string) {
+	if !a.IsLoggedIn(accountId) {
 		log.Println("UpdateMessages: User not logged in.")
+		return
+	}
+
+	account, ok := a.accounts[accountId]
+	if !ok {
+		log.Println("Account not found for ID:", accountId)
 		return
 	}
 
@@ -174,7 +197,7 @@ func (a *App) UpdateMessages(mailboxName string) {
 	}
 	defer messageUpdateMutex.Unlock()
 
-	existingUIDs, err := fetchExistingUIDs(a.db, mailboxName)
+	existingUIDs, err := fetchExistingUIDs(a.db, accountId, mailboxName)
 	if err != nil {
 		log.Println("Error fetching existing UIDs from database:", err)
 		return
@@ -241,11 +264,15 @@ func (a *App) UpdateMessages(mailboxName string) {
 		return nil
 	}
 
-	if a.oauthToken != nil {
-		oauthConfig := auth.GmailOAuthConfig
-		_, err = mail.WithOAuthClient(a.imapUrl, a.emailAddr, a.oauthToken, oauthConfig, fetchMessages)
+	if account.OAuthAccessToken != "" {
+		oauthConfig := auth.GmailOAuthConfig // TODO: Add support for other OAuth providers
+		_, err = mail.WithOAuthClient(account.ImapUrl, account.Email, &oauth2.Token{
+			AccessToken:  account.OAuthAccessToken,
+			RefreshToken: account.OAuthRefreshToken,
+			Expiry:       time.Unix(account.OAuthExpiry, 0),
+		}, oauthConfig, fetchMessages)
 	} else {
-		err = mail.WithClient(a.imapUrl, a.emailAddr, a.emailAppPassword, fetchMessages)
+		err = mail.WithClient(account.ImapUrl, account.Email, account.AppSpecificPassword, fetchMessages)
 	}
 
 	if err != nil {
@@ -266,8 +293,8 @@ func (a *App) UpdateMessages(mailboxName string) {
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-        INSERT INTO messages (mailbox_name, uid, envelope, body_plain, body_html, body_raw, received_at, last_updated) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (mailbox_name, account_id, uid, envelope, body_plain, body_html, body_raw, received_at, last_updated) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 	if err != nil {
 		log.Println("Error preparing statement to insert messages:", err)
@@ -282,7 +309,7 @@ func (a *App) UpdateMessages(mailboxName string) {
 			continue
 		}
 
-		_, err = stmt.Exec(mailboxName, msg.UID, envelopeData, msg.Body.Plain, msg.Body.HTML, nil, time.Now(), time.Now())
+		_, err = stmt.Exec(mailboxName, accountId, msg.UID, envelopeData, msg.Body.Plain, msg.Body.HTML, nil, time.Now(), time.Now())
 		if err != nil {
 			log.Println("Error inserting message UID", msg.UID, "into database:", err)
 		}
@@ -296,8 +323,8 @@ func (a *App) UpdateMessages(mailboxName string) {
 	runtime.EventsEmit(a.ctx, "MessagesUpdated", mailboxName)
 }
 
-func fetchExistingUIDs(db *sql.DB, mailboxName string) ([]uint32, error) {
-	rows, err := db.Query("SELECT uid FROM messages WHERE mailbox_name = ?", mailboxName)
+func fetchExistingUIDs(db *sql.DB, accountId int64, mailboxName string) ([]uint32, error) {
+	rows, err := db.Query("SELECT uid FROM messages WHERE mailbox_name = ? AND account_id = ?", mailboxName, accountId)
 	if err != nil {
 		return nil, err
 	}
